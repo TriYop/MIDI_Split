@@ -4,6 +4,7 @@
 
 from mido import MidiFile, MetaMessage, MidiTrack, Message
 import logging
+import os
 
 
 def write_midi_file(filename, pattern):
@@ -77,7 +78,8 @@ def read_midi_file(filename):
 def main():
     logging.basicConfig(filename='MIDI_split.log', level=logging.DEBUG)
 
-    in_pattern = read_midi_file("/home/yvan/workspace/MIDI_Tools/resources/20150902.mid")
+    # TODO replace fixed test dir and file names with params
+    in_pattern = read_midi_file(os.path.join(os.environ.get('HOME'), "workspace/MIDI_Tools/resources/20150902.mid"))
     channels, metas = filter_events(in_pattern)
 
     # instruments = []
@@ -88,7 +90,9 @@ def main():
         instruments = filter_instruments(channels[chan])
         cpt = 0
         for instrument in instruments:
-            fname = "/home/yvan/workspace/MIDI_Tools/resources/20150902_%s-%s.mid" % (ch, cpt)
+            os.path.join(os.environ.get('HOME'), "workspace/MIDI_Tools/resources/20150902.mid")
+            fname = os.path.join(os.environ.get('HOME'),
+                                 "workspace/MIDI_Tools/resources/20150902_%s-%s.mid" % (ch, cpt))
             out_pattern = MidiFile(ticks_per_beat=in_pattern.ticks_per_beat, charset=in_pattern.charset,
                                    type=in_pattern.type)
             out_pattern.tracks.append(instrument)
