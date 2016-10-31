@@ -40,16 +40,30 @@ def filter_events(pattern):
             if message.type != 'text':
                 metas.append({'message': message, 'abs_time': current_time})
 
-        elif message.type == 'note_on' or message.type == 'note_off' or message.type == 'program_change':
+        elif message.type in ['note_on', 'note_off', 'program_change', 'control_change']:
             chan = 'c' + str(message.channel)
             if chan not in channels:
                 channels[chan] = []
             channels[chan].append({'message': message, 'abs_time': current_time})
 
         else:
-            logging.error("Caught unexpected MIDI message: " % repr(message))
+            logging.error("Caught unexpected MIDI message: %s" % repr(message))
 
     return channels, metas
+
+
+def split_instruments(channel, metas):
+    tracks = {}
+    for event in channel:
+        msg = event['message']
+        atm = event['abs_time']
+        if msg.type == 'program_change':
+            pgm= msg.program
+            if pgm not in tracks:
+
+                pass
+            # Checker si déjà rencontré
+            # Créer le programme
 
 
 def filter_instruments(channel):
@@ -70,13 +84,15 @@ def filter_instruments(channel):
             instruments.append(track)
             current_instrument = msg.program
             if current_instrument not in current_pgm_time:
-                current_pgm_time[current_instrument] = 0
-                track.append(Message('program_change', program=current_instrument, time=0))
+                current_pgm_time[current_instrument] = 1
+                msg.time = 1
+                track.append(msg)
                 # rel_time = event['abs_time'] - current_pgm_time[current_instrument]
 
         else:
             rel_time = int(event['abs_time'] - current_pgm_time[current_instrument])
-            track.append(Message(msg.type, channel=msg.channel, note=msg.note, velocity=msg.velocity, time=rel_time))
+            msg.time = rel_time
+            track.append(msg)
         current_pgm_time[current_instrument] = event['abs_time']
     return instruments
 
@@ -108,13 +124,35 @@ def usage(msg=""):
     print("  -h|--help                      : displays this message")
 
 
+def append_metas(channel, metas):
+    pattern = []
+    chan = -1
+
+    midx=0
+    for cidx in range(len(channel)):
+        msg= channel[cidx]
+        if chan == -1:
+            chan = msg.channel
+        meta =  metas[midx]
+
+        while meta['abs_time'] <= msg['abs_time'] and midx<len(metas):
+            midx += 1
+            meta =  metas[midx]
+            logging.debug('%8d - Adding META %s' %(meta['abs_time'], repr(meta['message'])) )
+            pattern.append(meta)
+            # pattern[]
+        logging.debug('%3s %8d - Adding MESG %s' %(chan,  msg['abs_time'], repr(msg['message'])))
+        pattern.append(msg)
+    return pattern
+
+
 def main(argv):
     """
     Launches MIDI splitter, parses parameters and runs if possible.
     :param argv:
     :return:
     """
-    logging.basicConfig(filename='MIDI_split.log', level=logging.WARNING)
+
 
     try:
         optlist, args = getopt.getopt(argv, 'hvi:o:', ["help", "verbose", "input=", 'output='])
@@ -127,12 +165,13 @@ def main(argv):
     output_dir = ""
     input_set = False
     output_set = False
+    verbose = False
     for o, a in optlist:
         if o in ['-h', '--help']:
             usage()
             sys.exit()
         if o in ["-v", "--verbose"]:
-            logging.basicConfig(filename='MIDI_split.log', level=logging.DEBUG)
+            verbose = True
         elif o in ['-i', '--input']:
             input_file = a
             if os.path.isfile(input_file):
@@ -146,7 +185,17 @@ def main(argv):
         else:
             assert False, "unhandled option"
 
+    if verbose:
+        logging.basicConfig(filename='MIDI_split.log', level=logging.DEBUG)
+        logging.info("Logging set to verbose level.")
+
+    else:
+        logging.basicConfig(filename='MIDI_split.log', level=logging.WARNING)
+        logging.warn("Logging set to quiet level.")
+
     assert input_set and output_set, "Missing options"
+
+
 
     in_pattern = read_midi_file(input_file)
     base_name = os.path.basename(input_file).rsplit('.', 1)[0]
@@ -156,15 +205,18 @@ def main(argv):
 
     for chan in channels:
         instruments = filter_instruments(channels[chan])
-        cpt = 0
-        for instrument in instruments:
-            fname = os.path.join(output_dir, "%s_%s-%s.mid" % (base_name, ch, cpt))
-            out_pattern = MidiFile(ticks_per_beat=in_pattern.ticks_per_beat, charset=in_pattern.charset,
-                                   type=in_pattern.type)
-            out_pattern.tracks.append(instrument)
+        # instruments = split_instruments(channels[chan], metas)
+        if instruments != None:
+            cpt = 0
+            for instrument in instruments:
+                fname = os.path.join(output_dir, "%s_c%s-p%s.mid" % (base_name, ch, cpt))
+                out_pattern = MidiFile(ticks_per_beat=in_pattern.ticks_per_beat, charset=in_pattern.charset,
+                                       type=in_pattern.type)
+                out_pattern.tracks.append(instrument)
+                # out_pattern.tracks.append(append_metas(instrument, metas))
 
-            cpt += 1
-            write_midi_file(fname, out_pattern)
+                cpt += 1
+                write_midi_file(fname, out_pattern)
         ch += 1
 
 
