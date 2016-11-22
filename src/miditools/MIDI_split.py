@@ -9,6 +9,9 @@ import os
 import sys
 import getopt
 
+CHANNEL_MESSAGES = ['note_off', 'note_on', 'polytouch', 'control_change', 'program_change', 'pitchwheel', 'aftertouch']
+
+
 
 def write_midi_file(filename, pattern):
     """
@@ -17,7 +20,7 @@ def write_midi_file(filename, pattern):
     :param pattern:
     :return:
     """
-    logging.debug(repr(pattern))
+    logging.debug("Exporting MIDI channel to file://%s." % filename)
     if len(pattern.tracks[0]) > 0:
         # TODO: reinclude all META MESSAGES BEFORE SAVING
         logging.info("Generating output file: %s" % filename)
@@ -40,8 +43,9 @@ def filter_events(pattern):
             if message.type != 'text':
                 metas.append({'message': message, 'abs_time': current_time})
 
-        elif message.type in ['note_on', 'note_off', 'program_change', 'control_change']:
-            chan = 'c' + str(message.channel)
+        elif message.type in CHANNEL_MESSAGES:
+            # We do +1 because MIDI channels usually start numbering at 1 and channel 10 is usually drums one. Thus is it easier to read.
+            chan = 'c' + str(message.channel + 1)
             if chan not in channels:
                 channels[chan] = []
             channels[chan].append({'message': message, 'abs_time': current_time})
@@ -52,49 +56,76 @@ def filter_events(pattern):
     return channels, metas
 
 
-def split_instruments(channel, metas):
+def convert_list_to_track(evt_list):
+    track = MidiTrack()
+    current_time = 0
+    # Ensure events are sorted by absolute time
+
+    for event in evt_list:
+        print(event)
+        msg = event['message']
+        atm = event['abs_time']
+        rel_time = int(atm - current_time)
+        msg.time = rel_time
+        track.append(msg)
+        current_time = atm
+
+    return track
+
+
+def split_instruments(channel):
     tracks = {}
+    current_instrument = 0
+    current_pgm_time = {current_instrument: 0}
+    track = []
+
     for event in channel:
         msg = event['message']
         atm = event['abs_time']
+
         if msg.type == 'program_change':
             pgm= msg.program
             if pgm not in tracks:
-
-                pass
-            # Checker si déjà rencontré
-            # Créer le programme
-
-
-def filter_instruments(channel):
-    """
-    Splits each instruments to a single file.
-    :param channel:
-    :return:
-    """
-    instruments = []
-    current_instrument = 0
-    track = MidiTrack()
-    instruments.append(track)
-    current_pgm_time = {current_instrument: 0}
-    for event in channel:
-        msg = event['message']
-        if msg.type == 'program_change':
-            track = MidiTrack()
-            instruments.append(track)
-            current_instrument = msg.program
-            if current_instrument not in current_pgm_time:
-                current_pgm_time[current_instrument] = 1
-                msg.time = 1
-                track.append(msg)
-                # rel_time = event['abs_time'] - current_pgm_time[current_instrument]
-
+                track = []
+                tracks[pgm] = track
+                track.append({'message': msg, 'abs_time': atm})
+            else:
+                track = tracks[pgm]
         else:
-            rel_time = int(event['abs_time'] - current_pgm_time[current_instrument])
-            msg.time = rel_time
-            track.append(msg)
-        current_pgm_time[current_instrument] = event['abs_time']
-    return instruments
+            track.append({'message': msg, 'abs_time': atm})
+
+    return tracks
+
+
+# def filter_instruments(channel):
+#     """
+#     Splits each instruments to a single file.
+#     :param channel:
+#     :return:
+#     """
+#     instruments = []
+#     current_instrument = 0
+#     track = MidiTrack()
+#     instruments.append(track)
+#     current_pgm_time = {current_instrument: 0}
+#     for event in channel:
+#         msg = event['message']
+#         if msg.type == 'program_change':
+#             track = MidiTrack()
+#             instruments.append(track)
+#             current_instrument = msg.program
+#             if current_instrument not in current_pgm_time:
+#                 current_pgm_time[current_instrument] = 1
+#                 msg.time = 1
+#                 track.append(msg)
+#                 # rel_time = event['abs_time'] - current_pgm_time[current_instrument]
+#
+#         else:
+#             rel_time = int(event['abs_time'] - current_pgm_time[current_instrument])
+#             msg.time = rel_time
+#             track.append(msg)
+#         current_pgm_time[current_instrument] = event['abs_time']
+#     return instruments
 
 
 def read_midi_file(filename):
@@ -124,25 +155,26 @@ def usage(msg=""):
     print("  -h|--help                      : displays this message")
 
 
-def append_metas(channel, metas):
+def append_metas(track, metas):
     pattern = []
     chan = -1
-
+    abs_time = 0
     midx=0
-    for cidx in range(len(channel)):
-        msg= channel[cidx]
+    for cidx in range(len(track)):
+        evt = track[cidx]
+        msg = evt['message']
+        abs_time = evt['abs_time']
+
         if chan == -1:
             chan = msg.channel
         meta =  metas[midx]
 
-        while meta['abs_time'] <= msg['abs_time'] and midx<len(metas):
+        while meta['abs_time'] <= abs_time and midx < len(metas):
+            logging.debug('%8d - Adding META %s' % (meta['abs_time'], repr(meta['message'])))
+            pattern.append(meta)
             midx += 1
             meta =  metas[midx]
-            logging.debug('%8d - Adding META %s' %(meta['abs_time'], repr(meta['message'])) )
-            pattern.append(meta)
-            # pattern[]
-        logging.debug('%3s %8d - Adding MESG %s' %(chan,  msg['abs_time'], repr(msg['message'])))
-        pattern.append(msg)
+        pattern.append(evt)
     return pattern
 
 
@@ -204,16 +236,19 @@ def main(argv):
     ch = 0
 
     for chan in channels:
-        instruments = filter_instruments(channels[chan])
-        # instruments = split_instruments(channels[chan], metas)
+        # instruments = filter_instruments(channels[chan])
+        instruments = split_instruments(channels[chan])
+
         if instruments != None:
             cpt = 0
             for instrument in instruments:
-                fname = os.path.join(output_dir, "%s_c%s-p%s.mid" % (base_name, ch, cpt))
+                logging.debug("Appending instrument %s to output" % instrument)
+                fname = os.path.join(output_dir, "%s_%s-p%s.mid" % (base_name, chan, instrument))
+                logging.debug("Output file: %s" % fname)
                 out_pattern = MidiFile(ticks_per_beat=in_pattern.ticks_per_beat, charset=in_pattern.charset,
                                        type=in_pattern.type)
-                out_pattern.tracks.append(instrument)
-                # out_pattern.tracks.append(append_metas(instrument, metas))
+                # out_pattern.tracks.append(instruments[instrument])
+                out_pattern.tracks.append(convert_list_to_track(append_metas(instruments[instrument], metas)))
 
                 cpt += 1
                 write_midi_file(fname, out_pattern)
