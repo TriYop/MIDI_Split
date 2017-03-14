@@ -1,4 +1,15 @@
 
 
+# Do not manage log files that may
 *.log
+
+# Do not manage sample MIDI and audio files that may present some copyright issue
+*.mid
+*.wav
+*.ogg
+
+# Do not manage IDE specific files/configuration for project
+.idea
+.sonar
+bin
 

@@ -1,16 +1,18 @@
+#!/usr/bin/env python3
+"""
+
+"""
 #
 # Separate MIDI channels from a MIDI FILE
 #
-#
 
-from mido import MidiFile, MetaMessage, MidiTrack, Message
+from mido import MidiFile, MetaMessage, MidiTrack
 import logging
 import os
 import sys
 import getopt
 
 CHANNEL_MESSAGES = ['note_off', 'note_on', 'polytouch', 'control_change', 'program_change', 'pitchwheel', 'aftertouch']
-
 
 
 def write_midi_file(filename, pattern):
@@ -44,7 +46,7 @@ def filter_events(pattern):
                 metas.append({'message': message, 'abs_time': current_time})
 
         elif message.type in CHANNEL_MESSAGES:
-            # We do +1 because MIDI channels usually start numbering at 1 and channel 10 is usually drums one. Thus is it easier to read.
+            # We do +1 because MIDI channels usually start numbering at 1 and channel 10 is usually drums one.
             chan = 'c' + str(message.channel + 1)
             if chan not in channels:
                 channels[chan] = []
@@ -57,9 +59,13 @@ def filter_events(pattern):
 
 
 def convert_list_to_track(evt_list):
+    """
+    Converts a list of events to a MIDI track with relative times
+    :param evt_list:
+    :return:
+    """
     track = MidiTrack()
     current_time = 0
-    # Ensure events are sorted by absolute time
 
     for event in evt_list:
         print(event)
@@ -74,17 +80,22 @@ def convert_list_to_track(evt_list):
 
 
 def split_instruments(channel):
+    """
+    Splits a single MIDI channel into as many single instrument channels.
+
+    :param channel:
+    :return:
+    """
     tracks = {}
-    current_instrument = 0
-    current_pgm_time = {current_instrument: 0}
     track = []
 
+    # FIXME if track does not start with program_change, then behavior is unknown
     for event in channel:
         msg = event['message']
         atm = event['abs_time']
 
         if msg.type == 'program_change':
-            pgm= msg.program
+            pgm = msg.program
             if pgm not in tracks:
                 track = []
                 tracks[pgm] = track
@@ -95,37 +106,6 @@ def split_instruments(channel):
             track.append({'message': msg, 'abs_time': atm})
 
     return tracks
-
-
-# def filter_instruments(channel):
-#     """
-#     Splits each instruments to a single file.
-#     :param channel:
-#     :return:
-#     """
-#     instruments = []
-#     current_instrument = 0
-#     track = MidiTrack()
-#     instruments.append(track)
-#     current_pgm_time = {current_instrument: 0}
-#     for event in channel:
-#         msg = event['message']
-#         if msg.type == 'program_change':
-#             track = MidiTrack()
-#             instruments.append(track)
-#             current_instrument = msg.program
-#             if current_instrument not in current_pgm_time:
-#                 current_pgm_time[current_instrument] = 1
-#                 msg.time = 1
-#                 track.append(msg)
-#                 # rel_time = event['abs_time'] - current_pgm_time[current_instrument]
-#
-#         else:
-#             rel_time = int(event['abs_time'] - current_pgm_time[current_instrument])
-#             msg.time = rel_time
-#             track.append(msg)
-#         current_pgm_time[current_instrument] = event['abs_time']
-#     return instruments
 
 
 def read_midi_file(filename):
@@ -156,10 +136,15 @@ def usage(msg=""):
 
 
 def append_metas(track, metas):
+    """
+    Appends META information to any list of events.
+    :param track:
+    :param metas:
+    :return:
+    """
     pattern = []
     chan = -1
-    abs_time = 0
-    midx=0
+    midx = 0
     for cidx in range(len(track)):
         evt = track[cidx]
         msg = evt['message']
@@ -167,13 +152,13 @@ def append_metas(track, metas):
 
         if chan == -1:
             chan = msg.channel
-        meta =  metas[midx]
+        meta = metas[midx]
 
         while meta['abs_time'] <= abs_time and midx < len(metas):
             logging.debug('%8d - Adding META %s' % (meta['abs_time'], repr(meta['message'])))
             pattern.append(meta)
             midx += 1
-            meta =  metas[midx]
+            meta = metas[midx]
         pattern.append(evt)
     return pattern
 
@@ -184,8 +169,6 @@ def main(argv):
     :param argv:
     :return:
     """
-
-
     try:
         optlist, args = getopt.getopt(argv, 'hvi:o:', ["help", "verbose", "input=", 'output='])
     except getopt.GetoptError as error:
@@ -223,11 +206,9 @@ def main(argv):
 
     else:
         logging.basicConfig(filename='MIDI_split.log', level=logging.WARNING)
-        logging.warn("Logging set to quiet level.")
+        logging.warning("Logging set to quiet level.")
 
     assert input_set and output_set, "Missing options"
-
-
 
     in_pattern = read_midi_file(input_file)
     base_name = os.path.basename(input_file).rsplit('.', 1)[0]
@@ -236,10 +217,9 @@ def main(argv):
     ch = 0
 
     for chan in channels:
-        # instruments = filter_instruments(channels[chan])
         instruments = split_instruments(channels[chan])
 
-        if instruments != None:
+        if instruments is not None:
             cpt = 0
             for instrument in instruments:
                 logging.debug("Appending instrument %s to output" % instrument)
