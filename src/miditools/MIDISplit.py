@@ -13,11 +13,12 @@ import sys
 
 from mido import MidiFile, MetaMessage, MidiTrack
 
-from miditools import MIDI_check
+from miditools import MIDICheck
 
 CHANNEL_MESSAGES = ['note_off', 'note_on', 'polytouch', 'control_change', 'program_change', 'pitchwheel', 'aftertouch']
 
 logger = logging.getLogger("miditools.MIDI_split")
+
 
 def write_midi_file(filename, pattern):
     """
@@ -227,7 +228,7 @@ def main(argv):
             cpt = 0
             for instrument in instruments:
                 # Checks if instrument is valid
-                MIDI_check.check_channel(instrument, instruments[instrument])
+                MIDICheck.check_channel(instrument, instruments[instrument])
 
                 logging.debug("Appending instrument %s to output" % instrument)
                 fname = os.path.join(output_dir, "%s_%s-p%s.mid" % (base_name, chan, instrument))
