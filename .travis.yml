@@ -14,7 +14,10 @@ install:
 
 before_script:
   - export PYTHONPATH=$PYTHONPATH:src/:.
+  - export CODACY_PROJECT_TOKEN=ebb91db911374e9fbebbfe8af0f93faf
 
 script:
  - pytest --cov=miditools tests/
+ - coverage xml
+ - python-codacy-coverage -r coverage.xml
 
