@@ -203,7 +203,8 @@ def main(argv):
             if os.path.isdir(output_dir):
                 output_set = True
         else:
-            assert False, "unhandled option"
+            logger.info("unhandled option")
+            return
 
     if verbose:
         logging.basicConfig(filename='MIDI_split.log', level=logging.DEBUG)
@@ -213,7 +214,8 @@ def main(argv):
         logging.basicConfig(filename='MIDI_split.log', level=logging.WARNING)
         logging.warning("Logging set to quiet level.")
 
-    assert input_set and output_set, "Missing options"
+    if not (input_set and output_set):
+        logger.info ("Missing options")
 
     in_pattern = read_midi_file(input_file)
     base_name = os.path.basename(input_file).rsplit('.', 1)[0]
