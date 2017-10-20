@@ -1,6 +1,5 @@
-import pytest
-from miditools import MIDIConstants
 from miditools import MIDICheck
+from miditools import MIDIConstants
 
 
 def test_check_note_invalid_note():
