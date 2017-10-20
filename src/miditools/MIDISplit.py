@@ -6,13 +6,18 @@
 # Separate MIDI channels from a MIDI FILE
 #
 
-from mido import MidiFile, MetaMessage, MidiTrack
+import getopt
 import logging
 import os
 import sys
-import getopt
+
+from mido import MidiFile, MetaMessage, MidiTrack
+
+from miditools import MIDICheck
 
 CHANNEL_MESSAGES = ['note_off', 'note_on', 'polytouch', 'control_change', 'program_change', 'pitchwheel', 'aftertouch']
+
+logger = logging.getLogger("miditools.MIDI_split")
 
 
 def write_midi_file(filename, pattern):
@@ -25,7 +30,7 @@ def write_midi_file(filename, pattern):
     logging.debug("Exporting MIDI channel to file://%s." % filename)
     if len(pattern.tracks[0]) > 0:
         # TODO: reinclude all META MESSAGES BEFORE SAVING
-        logging.info("Generating output file: %s" % filename)
+        logger.info("Generating output file: %s" % filename)
         pattern.save(filename)
 
 
@@ -53,7 +58,7 @@ def filter_events(pattern):
             channels[chan].append({'message': message, 'abs_time': current_time})
 
         else:
-            logging.error("Caught unexpected MIDI message: %s" % repr(message))
+            logger.error("Caught unexpected MIDI message: %s" % repr(message))
 
     return channels, metas
 
@@ -68,7 +73,7 @@ def convert_list_to_track(evt_list):
     current_time = 0
 
     for event in evt_list:
-        print(event)
+        logger.debug(event)
         msg = event['message']
         atm = event['abs_time']
         rel_time = int(atm - current_time)
@@ -115,7 +120,7 @@ def read_midi_file(filename):
     :return:
     """
     pattern = MidiFile(filename)
-    logging.debug(repr(pattern))
+    logger.debug(repr(pattern))
     return pattern
 
 
@@ -155,7 +160,7 @@ def append_metas(track, metas):
         meta = metas[midx]
 
         while meta['abs_time'] <= abs_time and midx < len(metas):
-            logging.debug('%8d - Adding META %s' % (meta['abs_time'], repr(meta['message'])))
+            logger.debug('%8d - Adding META %s' % (meta['abs_time'], repr(meta['message'])))
             pattern.append(meta)
             midx += 1
             meta = metas[midx]
@@ -222,6 +227,9 @@ def main(argv):
         if instruments is not None:
             cpt = 0
             for instrument in instruments:
+                # Checks if instrument is valid
+                MIDICheck.check_channel(instrument, instruments[instrument])
+
                 logging.debug("Appending instrument %s to output" % instrument)
                 fname = os.path.join(output_dir, "%s_%s-p%s.mid" % (base_name, chan, instrument))
                 logging.debug("Output file: %s" % fname)

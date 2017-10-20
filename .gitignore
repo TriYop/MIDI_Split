@@ -13,3 +13,7 @@
 .sonar
 bin
 
+**/__pycache__/
+
+.cache
+.coverage

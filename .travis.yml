@@ -1,9 +1,6 @@
 language: python
 python:
-  - "2.6"
   - "2.7"
-  - "3.2"
-  - "3.3"
   - "3.4"
   - "3.5"
   - "3.5-dev"
@@ -15,6 +12,9 @@ python:
 install:
   - pip install -r requirements.txt
 
-# script:
-#  - pytest
+before_script:
+  - export PYTHONPATH=$PYTHONPATH:src/:.
+
+script:
+ - pytest --cov=miditools tests/
 
