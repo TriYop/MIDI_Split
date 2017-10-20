@@ -19,5 +19,5 @@ before_script:
   - export PYTHONPATH=$PYTHONPATH:src/:.
 
 script:
- - pytest --cov=MIDI_Split
+ - pytest --cov=miditools tests/
 
