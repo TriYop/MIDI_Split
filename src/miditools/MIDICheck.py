@@ -4,8 +4,9 @@
 import logging
 
 from miditools import MIDIConstants
-
+logging.basicConfig(level=logging.INFO, format=MIDIConstants.MIDI_LOG_FORMATTER)
 logger = logging.getLogger("miditools.MIDISplit")
+
 
 """
 Checks if MIDI file describes "valid music"
@@ -31,7 +32,10 @@ def check_channel(instrument, evt_list):
             message = event['message']
             if message.type == 'note_on':
                 if not check_note(instrument, message.note):
-                    logger.warn("Instrument %d (%s) cannot play note %d" % (
-                        instrument, instrument, message.note))
+                    logger.warn("Instrument %d (%s) cannot play note %d (%s)." % (
+                        instrument, instrument, message.note, MIDIConstants.MIDI_NOTES_NAMES[message.note]))
                     result = False
+
+                else:
+                    logger.debug("Instrument %d (%s) can play note %d" %(instrument, instrument, message.note))
     return result
