@@ -1,4 +1,6 @@
-# Check if note may be played by selected instrument
+# Check if note may be played by selected instrumenthttps://books.google.fr/books?id=VPl5DQAAQBAJ&pg=SA3-PA36-IA10&lpg=SA3-PA36-IA10&dq=valid+MIDI+notes+for+acoustic+instruments&source=bl&ots=r22FiPWbHv&sig=22xBajVHtOIVpysjN1G5gqEn4p4&hl=fr&sa=X&ved=0ahUKEwjpo8PolYXXAhVEXBQKHYPrBvQQ6AEIPTAH#v=onepage&q=valid%20MIDI%20notes%20for%20acoustic%20instruments&f=false
+# See https://books.google.fr/books?id=VPl5DQAAQBAJ&pg=SA3-PA36-IA10&lpg=SA3-PA36-IA10&dq=valid+MIDI+notes+for+acoustic+instruments&source=bl&ots=r22FiPWbHv&sig=22xBajVHtOIVpysjN1G5gqEn4p4&hl=fr&sa=X&ved=0ahUKEwjpo8PolYXXAhVEXBQKHYPrBvQQ6AEIPTAH#v=onepage&q=valid%20MIDI%20notes%20for%20acoustic%20instruments&f=false
+# for MIDI programming issues and automation options ...
 
 MIDI_LOG_FORMATTER = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 MIDI_NOTES_NAMES = ["C-2", "C#-2", "D-2", "D#-2", "E-2", "F-2", "F#-2", "G-2", "G#-2", "A-2", "A#-2", "B-2",
