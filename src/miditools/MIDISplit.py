@@ -7,6 +7,7 @@
 #
 
 import getopt
+
 import logging
 import os
 import sys
@@ -14,9 +15,10 @@ import sys
 from mido import MidiFile, MetaMessage, MidiTrack
 
 from miditools import MIDICheck
+from miditools import MIDIConstants
 
 CHANNEL_MESSAGES = ['note_off', 'note_on', 'polytouch', 'control_change', 'program_change', 'pitchwheel', 'aftertouch']
-
+logging.basicConfig(level=logging.INFO, format=MIDIConstants.MIDI_LOG_FORMATTER)
 logger = logging.getLogger("miditools.MIDI_split")
 
 
@@ -27,11 +29,14 @@ def write_midi_file(filename, pattern):
     :param pattern:
     :return:
     """
-    logging.debug("Exporting MIDI channel to file://%s." % filename)
-    if len(pattern.tracks[0]) > 0:
+    logger.debug("Exporting MIDI channel to file://%s." % filename)
+
+    if len(pattern.tracks) > 0 and len(pattern.tracks[0]) > 0:
         # TODO: reinclude all META MESSAGES BEFORE SAVING
         logger.info("Generating output file: %s" % filename)
         pattern.save(filename)
+    else:
+        logger.info("Not generating output for empty pattern.")
 
 
 def filter_events(pattern):
@@ -150,8 +155,10 @@ def append_metas(track, metas):
     pattern = []
     chan = -1
     midx = 0
-    for cidx in range(len(track)):
-        evt = track[cidx]
+    metan = len(metas) - 1
+    print(track)
+
+    for evt in track:
         msg = evt['message']
         abs_time = evt['abs_time']
 
@@ -159,7 +166,7 @@ def append_metas(track, metas):
             chan = msg.channel
         meta = metas[midx]
 
-        while meta['abs_time'] <= abs_time and midx < len(metas):
+        while meta['abs_time'] <= abs_time and midx < metan:
             logger.debug('%8d - Adding META %s' % (meta['abs_time'], repr(meta['message'])))
             pattern.append(meta)
             midx += 1
@@ -168,19 +175,41 @@ def append_metas(track, metas):
     return pattern
 
 
-def main(argv):
+def do_split(input_file, output_dir):
     """
-    Launches MIDI splitter, parses parameters and runs if possible.
-    :param argv:
+    Parses MIDI file and splits tracks
+    :param input_file:
+    :param output_dir:
     :return:
     """
-    try:
-        optlist, args = getopt.getopt(argv, 'hvi:o:', ["help", "verbose", "input=", 'output='])
-    except getopt.GetoptError as error:
-        logging.error(error)
-        usage()
-        sys.exit(2)
+    in_pattern = read_midi_file(input_file)
+    base_name = os.path.basename(input_file).rsplit('.', 1)[0]
+    channels, metas = filter_events(in_pattern)
+    logger.debug(repr(metas))
+    ch = 0
 
+    for chan in channels:
+        instruments = split_instruments(channels[chan])
+
+        if instruments is not None:
+            cpt = 0
+            for instrument in instruments:
+                # Checks if instrument is valid
+                MIDICheck.check_channel(instrument, instruments[instrument])
+
+                logger.debug("Appending instrument %s to output" % instrument)
+                fname = os.path.join(output_dir, "%s_%s-p%s.mid" % (base_name, chan, instrument))
+                logger.debug("Output file: %s" % fname)
+                out_pattern = MidiFile(ticks_per_beat=in_pattern.ticks_per_beat, charset=in_pattern.charset,
+                                       type=in_pattern.type)
+                out_pattern.tracks.append(convert_list_to_track(append_metas(instruments[instrument], metas)))
+
+                cpt += 1
+                write_midi_file(fname, out_pattern)
+        ch += 1
+
+
+def parse_options(optlist, args):
     input_file = ""
     output_dir = ""
     input_set = False
@@ -196,53 +225,53 @@ def main(argv):
             input_file = a
             if os.path.isfile(input_file):
                 input_set = True
+            else:
+                logger.error("Input file '%s' not found." % input_file)
         elif o in ['-o', '--output']:
             output_dir = a
             if not os.path.exists(output_dir):
+                logger.debug("Creating non existing output directory.")
                 os.mkdir(output_dir)
             if os.path.isdir(output_dir):
                 output_set = True
+            else:
+                logger.error("Directory '%s' does not exist and was not created." % output_dir)
         else:
-            logger.info("unhandled option")
-            return
+            logger.error("Invalidoption")
+            return None, None
 
     if verbose:
         logging.basicConfig(filename='MIDI_split.log', level=logging.DEBUG)
-        logging.info("Logging set to verbose level.")
+        logger.info("Logging set to verbose level.")
 
     else:
         logging.basicConfig(filename='MIDI_split.log', level=logging.WARNING)
-        logging.warning("Logging set to quiet level.")
+        logger.warning("Logging set to quiet level.")
 
     if not (input_set and output_set):
-        logger.info ("Missing options")
+        logger.error("Missing options")
+        return None, None
 
-    in_pattern = read_midi_file(input_file)
-    base_name = os.path.basename(input_file).rsplit('.', 1)[0]
-    channels, metas = filter_events(in_pattern)
-    logging.debug(repr(metas))
-    ch = 0
+    return input_file, output_dir
 
-    for chan in channels:
-        instruments = split_instruments(channels[chan])
 
-        if instruments is not None:
-            cpt = 0
-            for instrument in instruments:
-                # Checks if instrument is valid
-                MIDICheck.check_channel(instrument, instruments[instrument])
-
-                logging.debug("Appending instrument %s to output" % instrument)
-                fname = os.path.join(output_dir, "%s_%s-p%s.mid" % (base_name, chan, instrument))
-                logging.debug("Output file: %s" % fname)
-                out_pattern = MidiFile(ticks_per_beat=in_pattern.ticks_per_beat, charset=in_pattern.charset,
-                                       type=in_pattern.type)
-                # out_pattern.tracks.append(instruments[instrument])
-                out_pattern.tracks.append(convert_list_to_track(append_metas(instruments[instrument], metas)))
-
-                cpt += 1
-                write_midi_file(fname, out_pattern)
-        ch += 1
+def main(argv):
+    """
+    Launches MIDI splitter, parses parameters and runs if possible.
+    :param argv:
+    :return:
+    """
+    try:
+        optlist, args = getopt.getopt(argv, 'hvi:o:', ["help", "verbose", "input=", 'output='])
+    except getopt.GetoptError as error:
+        logger.error(error)
+        usage()
+        sys.exit(2)
+    input_file, output_dir = parse_options(optlist, args)
+    if input_file is not None and output_dir is not None:
+        do_split(input_file, output_dir)
+    else:
+        usage()
 
 
 if __name__ == '__main__':
