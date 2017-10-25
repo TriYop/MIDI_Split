@@ -3,3 +3,4 @@ mido
 pytest
 pytest-cov
 codacy-coverage
+codecov
