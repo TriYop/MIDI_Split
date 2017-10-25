@@ -21,3 +21,6 @@ script:
  - coverage xml
  - python-codacy-coverage -r coverage.xml
 
+after_success:
+ - codecov
+
