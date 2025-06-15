@@ -4,3 +4,4 @@ pytest
 pytest-cov
 codacy-coverage
 certifi>=2022.12.7 # not directly required, pinned by Snyk to avoid a vulnerability
+requests>=2.32.4 # not directly required, pinned by Snyk to avoid a vulnerability
